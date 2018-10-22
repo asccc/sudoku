@@ -144,6 +144,10 @@ static unsigned find_slot (
     for (col = 0; col < 9; ++col) {
       if (grid[row * 9 + col] == 0) {
         csc = calc_score(grid, row, col);
+        if (csc > 7) {
+          /* best possible result */
+          return row * 9 + col;
+        }
         if (csc > psc) {
           psc = csc;
           idx = row * 9 + col;
@@ -229,8 +233,6 @@ static void * find_solution_th (void *pass)
   /* get out */
   return 0;
 }
-
-static void print_puzzle_fancy(unsigned*,FILE*);
 
 /**
  * starts the single-threaded solver in a thread
