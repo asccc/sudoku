@@ -138,8 +138,9 @@ static unsigned find_slot (
   /* score benchmark, the higher the better */
   signed csc = 0;
   signed psc = -1;
-  unsigned row;
-  unsigned col;
+  for (unsigned i = 0; i < (9*9); ++i) {
+
+  }
   for (row = 0; row < 9; ++row) {
     for (col = 0; col < 9; ++col) {
       if (grid[row * 9 + col] == 0) {
