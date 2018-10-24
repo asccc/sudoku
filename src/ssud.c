@@ -368,7 +368,6 @@ static bool find_solution_mt (
 
   /* how many threads are in use */
   unsigned puse = pidx;
-  printf("using %u threads\n", puse);
 
   /* wait for all threads to come back */
   while (puse > 0) {
