@@ -31,7 +31,7 @@ struct sopts {
   /* use threads */
   bool threads;
   /* use fancy output-format */
-  bool fancyof;
+  bool fancy;
   /* show help */
   bool help;
 };
@@ -138,11 +138,8 @@ static unsigned find_slot (
   /* score benchmark, the higher the better */
   signed csc = 0;
   signed psc = -1;
-  for (unsigned i = 0; i < (9*9); ++i) {
-
-  }
-  for (row = 0; row < 9; ++row) {
-    for (col = 0; col < 9; ++col) {
+  for (unsigned row = 0; row < 9; ++row) {
+    for (unsigned col = 0; col < 9; ++col) {
       if (grid[row * 9 + col] == 0) {
         csc = calc_score(grid, row, col);
         if (csc > 7) {
@@ -222,6 +219,7 @@ static void * find_solution_th (void *pass)
   unsigned *smem = pass;
   unsigned *stat = smem; /* status slot */
   unsigned *grid = smem + 1;
+  *stat = SRUNNING;
   /* set cancel state */
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, 0);
   /* use the single-thread solver */
@@ -257,7 +255,6 @@ static void solve_fork (
   /* first slot is for the success/failure status */
   memcpy(smem + 1, grid, sizeof(unsigned)*9*9);
   /* fill in the number to test */
-  smem[0] = SRUNNING;
   smem[idx + 1] = num;
   /* fork off! */
   pthread_create(pt, 0, find_solution_th, smem);
@@ -371,6 +368,7 @@ static bool find_solution_mt (
 
   /* how many threads are in use */
   unsigned puse = pidx;
+  printf("using %u threads\n", puse);
 
   /* wait for all threads to come back */
   while (puse > 0) {
@@ -389,9 +387,9 @@ static bool find_solution_mt (
         pact[pi] = false;
         free(tmem);
       }
-      /* wait a bit */
-      usleep(10);
     }
+    /* wait a bit */
+    usleep(1000);
   }
 
   /* stop here */
@@ -497,8 +495,13 @@ static void print_puzzle (
 
   if (!fancy) {
     /* simple output format used by @German */
+    unsigned col = 0;
     for (unsigned idx = 0; idx < (9*9); ++idx) {
       fprintf(out, "%u", grid[idx]);
+      if (col++ > 7) {
+        fputs("\n", out);
+        col = 0;
+      }
     }
   } else {
     print_puzzle_fancy(grid, out);
@@ -607,7 +610,7 @@ static void parse_sopts (
 ) {
   assert(opts != 0);
   opts->threads = true;
-  opts->fancyof = false;
+  opts->fancy = false;
   opts->help = false;
 
   if (argc == 1) {
@@ -621,7 +624,7 @@ static void parse_sopts (
       continue;
     }
     if (strcmp(argv[i], "-f") == 0) {
-      opts->fancyof = true;
+      opts->fancy = true;
       continue;
     }
     if (strcmp(argv[i], "-h") == 0 ||
@@ -667,14 +670,14 @@ int main (int argc, char *argv[])
   unsigned grid[(9 * 9)] = {0};
   read_puzzle_input(grid, stdin);
 
-  if (opts.fancyof) {
+  if (opts.fancy) {
     /* print input grid */
     print_puzzle(grid, stdout, true);
   }
 
   if (solve_puzzle(grid, opts.threads)) {
     /* puzzle was solved, print output grid */
-    print_puzzle(grid, stdout, opts.fancyof);
+    print_puzzle(grid, stdout, opts.fancy);
   } else {
     fputs("no solution\n", stdout);
   }
