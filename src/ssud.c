@@ -95,7 +95,7 @@ static bool check_number (
  * @param  col  column
  * @return      the score
  */
-signed calc_score (
+static signed calc_score (
   unsigned grid[],
   unsigned row,
   unsigned col
