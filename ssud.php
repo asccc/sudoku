@@ -105,7 +105,7 @@ function find_slot(array $grid): int
 {
   $idx = NOINDEX;
   $csc = 0;
-  $psc = 0;
+  $psc = -1;
   for ($i = 0; $i < 81; ++$i) {
     if ($grid[$i] === 0) {
       $csc = calc_score($grid, $i);
