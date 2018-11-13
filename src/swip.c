@@ -13,6 +13,7 @@
 
 #include <stdlib.h> /* exit, malloc, free */
 #include <stdio.h> /* stdin, feof, fgetc */
+#include <stdint.h> /* uint32_t */
 #include <stdbool.h> /* bool, true false */
 #include <string.h> /* memcpy */
 #include <pthread.h> /* pthread ... */
@@ -95,75 +96,79 @@ static bool check_number (
  * @param  col  column
  * @return      the score
  */
-static signed calc_score (
+static uint32_t find_cans (
   unsigned grid[],
-  unsigned row,
-  unsigned col
+  unsigned idx,
+  unsigned *len
 ) {
   assert(grid != 0);
-  unsigned seen[10] = {0};
+  uint32_t res = 0;
+  uint32_t msk = 0;
   /* calculate region */
+  const unsigned row = idx / 9;
+  const unsigned col = idx % 9;
   const unsigned rx = row / 3 * 3;
   const unsigned ry = col / 3 * 3;
   for (unsigned i = 0; i < 9; ++i) {
-    unsigned rnm = grid[(row * 9) + i];
+    unsigned rnm = grid[row + i];
     unsigned cnm = grid[col + (i * 9)];
+
+    /* 9 by 9 region */
     unsigned reg = 
-      (rx + (i / 3)) * 9 +
+      (rx + (i / 3)) * 9 + 
       (ry + (i % 3));
+
     unsigned gnm = grid[reg];
-    seen[rnm] = 1;
-    seen[cnm] = 1;
-    seen[gnm] = 1;
+
+    msk |= 1 << rnm;
+    msk |= 1 << cnm;
+    msk |= 1 << gnm;
   }
-  /* calculate score */
-  signed scr = 0;
-  for (unsigned i = 1; i < 10; ++i) {
-    scr += seen[i];
+  res = ~msk & 0x0000FFFF;
+  if (len) {
+    *len = 10;
+    while (msk > 0) {
+      if (msk & 1) {
+        assert(len > 0);
+        (*len)--;
+      }
+      msk >>= 1;
+    }
   }
-  return scr;
+  return res;
 }
 
 /**
  * returns a index in the grid with the least possibilities
  *
  * @param  grid the sudoku grid
- * @param  cand array for candidates
- * @return      the index or 81 if no index was found
+ * @param  out  candidate bitmask output
+ * @return      the index or NOINDEX if no index was found
  */
 static unsigned find_slot (
   unsigned grid[],
-  unsigned cand[]
+  uint32_t *out,
+  uint32_t *ncn
 ) {
   assert(grid != 0);
   unsigned idx = NOINDEX;
+  unsigned len = 0;
+  unsigned prv = 0;
   uint32_t can = 0; /* exact width due to bit magic */
-  uint32_t len = 0; /* exact width due to bit magic */
-  uint32_t num = 0; /* exact width due to bit magic */
-  uint32_t prv = 0; /* exact width due to bit magic */
   uint32_t pos = 0; /* exact width due to bit magic */
   /* check each index and fill-in
     obvious candidates */
   for (unsigned i = 0; i < (9*9); ++i) {
     if (grid[i] == 0) {
       /* empty slot */
-      can = find_cands(grid, i);
-      len = can & 0xFFFFFE00;
-      if (len === 1) {
-        /* only one candidate */
-        num = can & 0x1FF;
-        grid[i] = num;
-        continue;
-      }
+      can = find_cans(grid, i, &len);
       if (prv == 0 || len < prv) {
         /* better candidate */
         prv = len;
-        pos = can & 0x1FF;
+        pos = can;
         idx = i;
-
-        if (len == 2) {
+        if (len == 1) {
           /* best possible result */
-          /* len == 1 is handled above */
           break;
         }
       }
@@ -171,12 +176,8 @@ static unsigned find_slot (
   }
   /* check if we found something */
   if (pos != 0) {
-    /* pos is a bitmask */
-    for (uint32_t n = 1; n < 10; ++n) {
-      if (pos & (1 << (n-1)) {
-        cand[n] = 1;
-      }
-    }
+    if (out) *out = pos;
+    if (ncn) *ncn = prv;
   }
   return idx;
 }
@@ -196,25 +197,27 @@ static bool find_solution_st (
 ) {
   assert(grid != 0);
   unsigned idx;
-  /* candidates, note: 0 is included */
-  unsigned can[10] = {0};
 
-  /* find the first empty slot 
-    with least possibilities */
-  idx = find_slot(grid, can);
+  /* candidates bitmask */
+  uint32_t can = 0;
+  uint32_t len = 0;
+
+  idx = find_slot(grid, &can, &len);
 
   if (idx == NOINDEX) {
     /* no empty slot found */
     return true;
   }
 
-  #define UNROLLED_CHECK(n)         \
-    if (can[n] != 0) {              \
-      grid[idx] = n;                \
-      if (find_solution_st(grid)) { \
-        return true;                \
-      }                             \
-      grid[idx] = 0;                \
+  printf("found a index to test: %u\n", idx);
+
+  #define UNROLLED_CHECK(num)           \
+    if (can & (1ul << num)) {           \
+      grid[idx] = num;                  \
+      if (find_solution_st(grid)) {     \
+        return true;                    \
+      }                                 \
+      grid[idx] = 0;                    \
     }
 
   UNROLLED_CHECK(1);
@@ -365,8 +368,14 @@ static bool find_solution_mt (
   /* find the first empty slot 
     with least possibilities */
   unsigned idx;
-  unsigned can[10] = {0};
-  idx = find_slot(grid, can);
+  
+  uint32_t len = 0;
+  uint32_t can = 0;
+
+  /* solve slots with only one candidate 
+    until a slot with two or more candidates
+    is the next best option  */ 
+  idx = find_slot(grid, &can, &len);
 
   if (idx == NOINDEX) {
     /* no empty slot found */
@@ -375,7 +384,7 @@ static bool find_solution_mt (
 
   /* start one thread for each possible number */
   for (unsigned num = 1; num <= 9; ++num) {
-    if (can[num] != 0) {
+    if (can & (1 << num)) {
       unsigned *tmem = calloc(9*9+1, sizeof(unsigned));
       pthread_t *thrd = &pool[pidx];
       solve_fork(thrd, grid, tmem, idx, num);
