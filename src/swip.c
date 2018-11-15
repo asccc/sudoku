@@ -684,7 +684,7 @@ int main (int argc, char *argv[])
     0,0,0,2,0,0,4,0,0,
     0,0,0,3,6,0,0,0,0
   };
-
+  
   if (opts.test) {
     /* use hard input */
     memcpy(grid, hard, sizeof(unsigned)*(9*9));
