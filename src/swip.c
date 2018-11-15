@@ -69,8 +69,8 @@ static sud_mask find_cans (
   unsigned *len
 ) {
   assert(grid != 0);
-  uint32_t res = 0;
-  uint32_t msk = 0;
+  sud_mask res = 0;
+  sud_mask msk = 0;
   /* calculate region */
   const unsigned row = idx / 9;
   const unsigned col = idx % 9;
