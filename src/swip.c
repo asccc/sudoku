@@ -43,6 +43,8 @@ struct sopts {
   bool fancy;
   /* show help */
   bool help;
+  /* test mode (uses a "hard" grid) */
+  bool test;
 };
 
 /**
@@ -609,6 +611,7 @@ static void parse_sopts (
   opts->threads = true;
   opts->fancy = false;
   opts->help = false;
+  opts->test = false;
 
   if (argc == 1) {
     /* no options passed */
@@ -627,6 +630,10 @@ static void parse_sopts (
     if (strcmp(argv[i], "-h") == 0 ||
         strcmp(argv[i], "-?") == 0) {
       opts->help = true;
+      continue;
+    }
+    if (strcmp(argv[i], "-t") == 0) {
+      opts->test = true;
       continue;
     }
   }
@@ -665,7 +672,25 @@ int main (int argc, char *argv[])
 
   /* read grid */
   unsigned grid[(9 * 9)] = {0};
-  read_puzzle_input(grid, stdin);
+
+  static unsigned hard[] = {
+    0,0,0,5,0,1,0,0,0,
+    0,9,0,0,0,0,8,0,0,
+    0,6,0,0,0,0,0,0,0,
+    4,0,1,0,0,0,0,0,0,
+    0,0,0,0,7,0,0,9,0,
+    0,0,0,0,0,0,0,3,0,
+    8,0,0,0,0,0,1,0,5,
+    0,0,0,2,0,0,4,0,0,
+    0,0,0,3,6,0,0,0,0
+  };
+
+  if (opts.test) {
+    /* use hard input */
+    memcpy(grid, hard, sizeof(unsigned)*(9*9));
+  } else {
+    read_puzzle_input(grid, stdin);
+  }
 
   if (opts.fancy) {
     /* print input grid */
